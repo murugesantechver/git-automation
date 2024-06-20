@@ -2,7 +2,7 @@ name: Push Changes to Another Repo
 
 on:
   schedule:
-    - cron: "*/7 * * * *" # Runs every 7 minutes
+    - cron: "0 * * * *" # Runs every hour
   workflow_dispatch:
 
 jobs:
