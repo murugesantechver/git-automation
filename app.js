@@ -4,6 +4,7 @@ dotenv.config();
 const fs = require("fs");
 const path = require("path");
 const { Octokit } = require("@octokit/rest");
+const axios = require("axios");
 
 const repoDetails = require("./repo.config").repoConfig;
 
@@ -61,22 +62,43 @@ const updateMasterBranch = async (commitSha) => {
   });
 };
 
+const writeContent = async (filePath, content) => {
+  try {
+    fs.writeFileSync(filePath, content, { flag: "a+" });
+    return { success: true, content };
+  } catch (error) {
+    console.error("Error writing file:", error);
+    return { success: false, error };
+  }
+};
+
 const commitAndPush = async () => {
   try {
     const commitMessage = `Updated file.txt at ${new Date().toUTCString()}`;
 
-    const fileContent = fs.readFileSync(filePath, "utf8");
-    const baseTreeSha = await getBaseTreeSha();
-    const newTreeSha = await createTree(baseTreeSha, fileContent);
-    const newCommitSha = await createCommit(
-      newTreeSha,
-      baseTreeSha,
-      commitMessage
-    );
+    const apiData = await axios.get("https://reqres.in/api/users?page=2");
+    if (apiData.data.data) {
+      const writeData = await writeContent(
+        filePath,
+        JSON.stringify(apiData.data.data)
+      );
+      if (writeData.success) {
+        const fileContent = fs.readFileSync(filePath, "utf8");
+        const baseTreeSha = await getBaseTreeSha();
+        const newTreeSha = await createTree(baseTreeSha, fileContent);
+        const newCommitSha = await createCommit(
+          newTreeSha,
+          baseTreeSha,
+          commitMessage
+        );
 
-    await updateMasterBranch(newCommitSha);
+        await updateMasterBranch(newCommitSha);
 
-    console.log("File committed and pushed successfully.");
+        console.log("File committed and pushed successfully.");
+      } else {
+        throw new Error(writeData.error);
+      }
+    }
   } catch (error) {
     console.error("Error committing and pushing file:", error);
   }

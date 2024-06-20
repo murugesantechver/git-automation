@@ -5,10 +5,13 @@ const fs = require("fs");
 const path = require("path");
 const { Octokit } = require("@octokit/rest");
 
-const owner = "quilotechver";
-const repo = "geo-loc-fetch";
+const repoDetails = require("./repo.config").repoConfig;
+
+const owner = repoDetails.gitHubOwner;
+const repo = repoDetails.currentRepo;
+const branch = repoDetails.branch;
+
 const fileName = "file.txt";
-const commitMessage = `Updated file.txt at ${new Date().toUTCString()}`;
 const filePath = path.join(__dirname, fileName);
 
 const octokit = new Octokit({ auth: process.env.PAT });
@@ -17,7 +20,7 @@ const getBaseTreeSha = async () => {
   const response = await octokit.git.getRef({
     owner,
     repo,
-    ref: "heads/master",
+    ref: branch,
   });
   return response.data.object.sha;
 };
@@ -30,7 +33,7 @@ const createTree = async (baseTreeSha, fileContent) => {
     tree: [
       {
         path: fileName,
-        mode: "100644", // regular file mode
+        mode: "100644",
         content: fileContent,
       },
     ],
@@ -38,7 +41,7 @@ const createTree = async (baseTreeSha, fileContent) => {
   return response.data.sha;
 };
 
-const createCommit = async (treeSha, parentSha) => {
+const createCommit = async (treeSha, parentSha, commitMessage) => {
   const response = await octokit.git.createCommit({
     owner,
     repo,
@@ -53,17 +56,23 @@ const updateMasterBranch = async (commitSha) => {
   await octokit.git.updateRef({
     owner,
     repo,
-    ref: "heads/master",
+    ref: branch,
     sha: commitSha,
   });
 };
 
 const commitAndPush = async () => {
   try {
+    const commitMessage = `Updated file.txt at ${new Date().toUTCString()}`;
+
     const fileContent = fs.readFileSync(filePath, "utf8");
     const baseTreeSha = await getBaseTreeSha();
     const newTreeSha = await createTree(baseTreeSha, fileContent);
-    const newCommitSha = await createCommit(newTreeSha, baseTreeSha);
+    const newCommitSha = await createCommit(
+      newTreeSha,
+      baseTreeSha,
+      commitMessage
+    );
 
     await updateMasterBranch(newCommitSha);
 
@@ -73,5 +82,58 @@ const commitAndPush = async () => {
   }
 };
 
+const pullAndUpdate = async (branch) => {
+  try {
+    const { data: fileData } = await octokit.repos.getContent({
+      owner,
+      repo,
+      path: fileName,
+      ref: branch,
+    });
+
+    const fileContent = Buffer.from(
+      fileData.content,
+      fileData.encoding
+    ).toString("utf8");
+
+    fs.writeFileSync(filePath, fileContent);
+
+    console.log(
+      `File ${fileName} pulled and updated successfully from branch ${branch}.`
+    );
+  } catch (error) {
+    console.error(
+      `Error pulling and updating file from branch ${branch}:`,
+      error
+    );
+  }
+};
+
+const createNewBranchFromMaster = async (newBranch) => {
+  try {
+    const {
+      data: {
+        object: { sha: masterSha },
+      },
+    } = await octokit.git.getRef({
+      owner,
+      repo,
+      ref: branch,
+    });
+
+    await octokit.git.createRef({
+      owner,
+      repo,
+      ref: `refs/heads/${newBranch}`,
+      sha: masterSha,
+    });
+
+    console.log(`New branch ${newBranch} created successfully from master.`);
+  } catch (error) {
+    console.error(`Error creating new branch ${newBranch} from master:`, error);
+  }
+};
+
 commitAndPush();
-r;
+//pullAndUpdate(branch);
+//createNewBranchFromMaster("new-feature-branch");
