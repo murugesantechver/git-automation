@@ -1,6 +1,6 @@
 module.exports.repoConfig = {
   currentRepo: "geo-loc-fetch",
   branch: "heads/master",
-  scheduleDate: { date: "every monday", time: "12:15 AM" },
+  scheduleDate: { date: "every day", time: "every hour" },
   gitHubOwner: "quilo-soman",
 };
